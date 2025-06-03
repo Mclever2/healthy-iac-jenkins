@@ -2,9 +2,7 @@ pipeline {
     agent any
     
     environment {
-        // Rutas relativas al workspace de Jenkins (ya no usamos /var/jenkins_home)
         PROJECT_DIR = "HealthyIAC"
-        BACKEND_DIR = "BackEnd"
         FRONTEND_DIR = "FrontEnd"
         AWS_REGION = "us-east-1"
     }
@@ -22,7 +20,7 @@ pipeline {
             steps {
                 script {
                     // Verifica que las carpetas existan
-                    dir(BACKEND_DIR) {
+                    dir(FRONTEND_DIR) {
                         sh 'ls -la'
                     }
                     dir(PROJECT_DIR) {
@@ -32,11 +30,12 @@ pipeline {
             }
         }
         
-        stage('Build Backend') {
+        stage('Build Frontend') {
             steps {
-                dir(BACKEND_DIR) {
-                    sh 'mvn clean package'
-                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                dir(FRONTEND_DIR) {
+                    sh 'npm install'
+                    sh 'npm run build'
+                    archiveArtifacts artifacts: 'build/**', fingerprint: true
                 }
             }
         }
@@ -65,22 +64,22 @@ pipeline {
             }
         }
         
-        stage('Deploy Backend') {
+        stage('Deploy Frontend') {
             steps {
                 script {
                     withAWS(credentials: 'aws-healthy-creds', region: AWS_REGION) {
-                        def backend_ips = sh(
-                            script: 'aws ec2 describe-instances --filters "Name=tag:Name,Values=Healthy-Backend" --query "Reservations[].Instances[].PrivateIpAddress" --output text',
+                        def frontend_ips = sh(
+                            script: 'aws ec2 describe-instances --filters "Name=tag:Name,Values=Healthy-Frontend" --query "Reservations[].Instances[].PrivateIpAddress" --output text',
                             returnStdout: true
                         ).trim()
                         
-                        if (backend_ips?.trim()) {
-                            backend_ips.split(' ').each { ip ->
-                                sh "scp -o StrictHostKeyChecking=no ${BACKEND_DIR}/target/*.jar ec2-user@${ip}:/home/ec2-user/app.jar"
-                                sh "ssh -o StrictHostKeyChecking=no ec2-user@${ip} 'sudo systemctl restart backend.service'"
+                        if (frontend_ips?.trim()) {
+                            frontend_ips.split(' ').each { ip ->
+                                sh "rsync -avz -e 'ssh -o StrictHostKeyChecking=no' ${FRONTEND_DIR}/build/ ec2-user@${ip}:/usr/share/nginx/html/"
+                                sh "ssh -o StrictHostKeyChecking=no ec2-user@${ip} 'sudo systemctl restart nginx'"
                             }
                         } else {
-                            echo "No se encontraron instancias EC2 con el tag Healthy-Backend"
+                            echo "No se encontraron instancias EC2 con el tag Healthy-Frontend"
                         }
                     }
                 }
