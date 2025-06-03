@@ -16,10 +16,23 @@ pipeline {
             }
         }
         
+        stage('Setup Node.js') {
+            steps {
+                script {
+                    // Verifica si Node.js está instalado
+                    try {
+                        sh 'node --version'
+                        sh 'npm --version'
+                    } catch (Exception e) {
+                        error "Node.js/npm no está instalado. Por favor instala Node.js en el agente Jenkins"
+                    }
+                }
+            }
+        }
+        
         stage('Verify Structure') {
             steps {
                 script {
-                    // Verifica que las carpetas existan
                     dir(FRONTEND_DIR) {
                         sh 'ls -la'
                     }
@@ -35,7 +48,7 @@ pipeline {
                 dir(FRONTEND_DIR) {
                     sh 'npm install'
                     sh 'npm run build'
-                    archiveArtifacts artifacts: 'build/**', fingerprint: true
+                    archiveArtifacts artifacts: 'dist/**', fingerprint: true
                 }
             }
         }
@@ -75,7 +88,7 @@ pipeline {
                         
                         if (frontend_ips?.trim()) {
                             frontend_ips.split(' ').each { ip ->
-                                sh "rsync -avz -e 'ssh -o StrictHostKeyChecking=no' ${FRONTEND_DIR}/build/ ec2-user@${ip}:/usr/share/nginx/html/"
+                                sh "rsync -avz -e 'ssh -o StrictHostKeyChecking=no' ${FRONTEND_DIR}/dist/ ec2-user@${ip}:/usr/share/nginx/html/"
                                 sh "ssh -o StrictHostKeyChecking=no ec2-user@${ip} 'sudo systemctl restart nginx'"
                             }
                         } else {
@@ -89,12 +102,16 @@ pipeline {
     
     post {
         always {
-            cleanWs()
+            deleteDir() // Alternativa a cleanWs si no tienes el plugin
         }
         failure {
-            mail to: 'caguilari1@upao.edu.pe',
-            subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
-            body: "El pipeline ha fallado. Ver detalles: ${env.BUILD_URL}"
+            script {
+                echo "Pipeline falló - Revisar en ${env.BUILD_URL}"
+                // Comentado hasta que configures correo correctamente
+                // mail to: 'caguilari1@upao.edu.pe',
+                // subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
+                // body: "El pipeline ha fallado. Ver detalles: ${env.BUILD_URL}"
+            }
         }
     }
 }
