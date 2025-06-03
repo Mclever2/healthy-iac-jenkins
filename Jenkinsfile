@@ -2,9 +2,8 @@ pipeline {
     agent any
     
     environment {
-        // Asegúrate que estas rutas coincidan con tu estructura
-        PROJECT_DIR = "HealthyIAC"  // Contiene los archivos de Terraform
-        FRONTEND_DIR = "FrontEnd"  // Contiene la aplicación frontend
+        PROJECT_DIR = "HealthyIAC"
+        FRONTEND_DIR = "FrontEnd"
         AWS_REGION = "us-east-1"
     }
     
@@ -20,18 +19,10 @@ pipeline {
         stage('Verificar Estructura') {
             steps {
                 script {
-                    // Verificación explícita de la estructura de directorios
-                    def files = findFiles()
-                    echo "Contenido del workspace: ${files.collect { it.name }}"
-                    
-                    // Verificación específica de los directorios clave
-                    dir(PROJECT_DIR) {
-                        sh 'ls -la'
-                        sh 'terraform --version'
-                    }
-                    dir(FRONTEND_DIR) {
-                        sh 'ls -la'
-                    }
+                    // Verificación alternativa sin findFiles
+                    sh 'ls -la'
+                    sh "ls -la ${PROJECT_DIR} || true"
+                    sh "ls -la ${FRONTEND_DIR} || true"
                 }
             }
         }
@@ -61,7 +52,6 @@ pipeline {
             steps {
                 dir(PROJECT_DIR) {
                     withAWS(credentials: 'aws-healthy-creds', region: AWS_REGION) {
-                        // Limpiar estado previo si existe
                         sh 'rm -rf .terraform* || true'
                         sh 'terraform init'
                     }
@@ -84,11 +74,7 @@ pipeline {
             steps {
                 dir(PROJECT_DIR) {
                     withAWS(credentials: 'aws-healthy-creds', region: AWS_REGION) {
-                        // Forzar el despliegue aunque no esté en main (para pruebas)
                         sh 'terraform apply -auto-approve'
-                        
-                        // Verificar el estado final
-                        sh 'terraform state list'
                         sh 'terraform output'
                     }
                 }
@@ -99,7 +85,7 @@ pipeline {
             steps {
                 script {
                     withAWS(credentials: 'aws-healthy-creds', region: AWS_REGION) {
-                        // Obtener IPs de las instancias frontend
+                        // Obtener IPs usando AWS CLI
                         def frontend_ips = sh(
                             script: 'aws ec2 describe-instances --filters "Name=tag:Name,Values=Healthy-Frontend" --query "Reservations[].Instances[].PublicIpAddress" --output text',
                             returnStdout: true
@@ -107,9 +93,12 @@ pipeline {
                         
                         if (frontend_ips?.trim()) {
                             frontend_ips.split(' ').each { ip ->
-                                echo "Desplegando frontend en ${ip}"
-                                sh "rsync -avz -e 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' ${FRONTEND_DIR}/dist/ ec2-user@${ip}:/usr/share/nginx/html/"
-                                sh "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ec2-user@${ip} 'sudo systemctl restart nginx'"
+                                sh """
+                                    rsync -avz -e 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' \
+                                    ${FRONTEND_DIR}/dist/ ec2-user@${ip}:/usr/share/nginx/html/
+                                    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                                    ec2-user@${ip} 'sudo systemctl restart nginx'
+                                """
                             }
                         } else {
                             error "No se encontraron instancias EC2 con el tag Healthy-Frontend"
@@ -122,21 +111,18 @@ pipeline {
     
     post {
         always {
-            script {
-                echo "Pipeline completado - Estado: ${currentBuild.currentResult}"
-                echo "URL del Build: ${env.BUILD_URL}"
-                
-                // Limpieza final
-                deleteDir()
-            }
+            deleteDir()
         }
         success {
             script {
-                // Obtener outputs de Terraform para mostrar URLs
+                echo "✅ Pipeline completado exitosamente"
+                // Obtener URL de salida de Terraform si existe
                 dir(PROJECT_DIR) {
                     withAWS(credentials: 'aws-healthy-creds', region: AWS_REGION) {
-                        def app_url = sh(script: 'terraform output -raw frontend_url || echo "No disponible"', returnStdout: true).trim()
-                        echo "✅ Despliegue completado correctamente"
+                        def app_url = sh(
+                            script: 'terraform output -raw frontend_url || echo "URL-no-disponible"',
+                            returnStdout: true
+                        ).trim()
                         echo "🌐 URL de la aplicación: ${app_url}"
                     }
                 }
@@ -144,9 +130,8 @@ pipeline {
         }
         failure {
             script {
-                echo "❌ Pipeline falló - Revisar en ${env.BUILD_URL}"
-                
-                // Intentar destruir la infraestructura si falla (opcional)
+                echo "❌ Pipeline falló - Revisar los logs"
+                // Limpieza opcional en caso de fallo
                 dir(PROJECT_DIR) {
                     withAWS(credentials: 'aws-healthy-creds', region: AWS_REGION) {
                         sh 'terraform destroy -auto-approve || true'
