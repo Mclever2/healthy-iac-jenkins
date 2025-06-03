@@ -18,37 +18,21 @@ pipeline {
         
         stage('Setup Node.js') {
             steps {
-                script {
-                    // Verifica si Node.js está instalado
-                    try {
-                        sh 'node --version'
-                        sh 'npm --version'
-                    } catch (Exception e) {
-                        error "Node.js/npm no está instalado. Por favor instala Node.js en el agente Jenkins"
-                    }
-                }
-            }
-        }
-        
-        stage('Verify Structure') {
-            steps {
-                script {
-                    dir(FRONTEND_DIR) {
-                        sh 'ls -la'
-                    }
-                    dir(PROJECT_DIR) {
-                        sh 'ls -la'
-                    }
+                nodejs(nodeJSInstallationName: 'NodeJS 16.x') {
+                    sh 'node --version'
+                    sh 'npm --version'
                 }
             }
         }
         
         stage('Build Frontend') {
             steps {
-                dir(FRONTEND_DIR) {
-                    sh 'npm install'
-                    sh 'npm run build'
-                    archiveArtifacts artifacts: 'dist/**', fingerprint: true
+                nodejs(nodeJSInstallationName: 'NodeJS 16.x') {
+                    dir(FRONTEND_DIR) {
+                        sh 'npm install'
+                        sh 'npm run build'
+                        archiveArtifacts artifacts: 'dist/**', fingerprint: true
+                    }
                 }
             }
         }
@@ -76,41 +60,15 @@ pipeline {
                 }
             }
         }
-        
-        stage('Deploy Frontend') {
-            steps {
-                script {
-                    withAWS(credentials: 'aws-healthy-creds', region: AWS_REGION) {
-                        def frontend_ips = sh(
-                            script: 'aws ec2 describe-instances --filters "Name=tag:Name,Values=Healthy-Frontend" --query "Reservations[].Instances[].PrivateIpAddress" --output text',
-                            returnStdout: true
-                        ).trim()
-                        
-                        if (frontend_ips?.trim()) {
-                            frontend_ips.split(' ').each { ip ->
-                                sh "rsync -avz -e 'ssh -o StrictHostKeyChecking=no' ${FRONTEND_DIR}/dist/ ec2-user@${ip}:/usr/share/nginx/html/"
-                                sh "ssh -o StrictHostKeyChecking=no ec2-user@${ip} 'sudo systemctl restart nginx'"
-                            }
-                        } else {
-                            echo "No se encontraron instancias EC2 con el tag Healthy-Frontend"
-                        }
-                    }
-                }
-            }
-        }
     }
     
     post {
         always {
-            deleteDir() // Alternativa a cleanWs si no tienes el plugin
+            deleteDir()
         }
         failure {
             script {
                 echo "Pipeline falló - Revisar en ${env.BUILD_URL}"
-                // Comentado hasta que configures correo correctamente
-                // mail to: 'caguilari1@upao.edu.pe',
-                // subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
-                // body: "El pipeline ha fallado. Ver detalles: ${env.BUILD_URL}"
             }
         }
     }
