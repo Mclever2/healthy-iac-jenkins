@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+ aws_emulator:
+  image: motoserver/moto:latest
+  container_name: aws
+  ports:
+   - "5010:5000"
+  environment:
+   - MOTO_PORT=5000

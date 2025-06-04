@@ -1,24 +1,39 @@
-# Compiled class file
-*.class
+# Ignorar archivos de estado de Terraform
+*.tfstate
+*.tfstate.backup
 
-# Log file
+# Archivos de plan y variables
+*.tfplan
+*.tfvars
+
+# Directorio donde Terraform guarda los plugins
+.terraform/
+
+# Archivos de bloqueo de Terraform
+.terraform.lock.hcl
+
+# Ignorar archivos binarios y ejecutables de proveedores de Terraform
+*.exe
+
+# Ignorar configuraciones locales de Terraform (si las hubiera)
+*.auto.tfvars
+
+# Archivos de log y temporales generados por Terraform
 *.log
 
-# BlueJ files
-*.ctxt
+# Otros archivos temporales generados por editores (Visual Studio Code, etc.)
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
+# Ignorar otros archivos potencialmente generados que no sean necesarios
+*.bak
 
-# Package Files #
-*.jar
-*.war
-*.nar
-*.ear
-*.zip
-*.tar.gz
-*.rar
-
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
-replay_pid*
+# Ignorar dependencias y archivos comunes de Node.js
+node_modules/
+.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
