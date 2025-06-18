@@ -9,6 +9,14 @@ pipeline {
     }
 
     stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                url: 'https://github.com/Mclever2/healthy-iac-jenkins.git',
+                credentialsId: 'github-creds'
+            }
+        }
+
         stage('Verificar Estructura') {
             steps {
                 script {
