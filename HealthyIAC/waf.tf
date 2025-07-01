@@ -1,5 +1,5 @@
 resource "aws_wafv2_web_acl" "cloudfront_waf" {
-  name        = "cloudfront-waf"
+  name        = "cloudfront-waf-v2-${terraform.workspace}"
   description = "WAF para CloudFront"
   scope       = "CLOUDFRONT"
 

@@ -1,5 +1,5 @@
 resource "aws_cloudfront_origin_access_control" "s3_oac" {
-  name                              = "s3-oac"
+  name                              = "oac-s3-${terraform.workspace}"
   description                       = "Access control para CloudFront con S3"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"

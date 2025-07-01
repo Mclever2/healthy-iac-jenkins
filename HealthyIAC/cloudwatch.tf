@@ -1,6 +1,6 @@
 # Configuración de CloudWatch Logs
 resource "aws_cloudwatch_log_group" "app_log_group" {
-  name              = "/ecs/healthy-iac-app"
+  name              = "/ecs/healthy-iac-app-${terraform.workspace}"
   retention_in_days = 30
   tags = {
     Environment = "production"
@@ -10,7 +10,7 @@ resource "aws_cloudwatch_log_group" "app_log_group" {
 
 # IAM Role para Grafana
 resource "aws_iam_role" "grafana_cloudwatch_role" {
-  name = "grafana-cloudwatch-role"
+  name = "grafana-cloudwatch-role-${terraform.workspace}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -28,7 +28,7 @@ resource "aws_iam_role" "grafana_cloudwatch_role" {
 
 # Política para acceder a CloudWatch
 resource "aws_iam_policy" "grafana_cloudwatch_policy" {
-  name        = "grafana-cloudwatch-policy"
+  name        = "grafana-cloudwatch-policy-${terraform.workspace}"
   description = "Permite a Grafana leer métricas de CloudWatch"
 
   policy = jsonencode({
